@@ -1,0 +1,82 @@
+{% extends 'base.html.twig' %}
+
+{% block title %} Receipt {% endblock %}
+
+        {% block stylesheets %}
+            <link rel="stylesheet" href="{{ asset('css/bootstrap.min.css') }}" />
+        {% endblock %}
+
+        {% block javascripts %}
+            <script src="{{ asset('js/bootstrap.min.js') }}"></script>
+        {% endblock %}
+
+{% block content %}
+    <h1>Enter details</h1>
+    {{ form_start(participantForm) }}
+    <div class="col">
+        <div class="form-group">
+            {{ form_label(participantForm.firstName, null, {'label_attr': {'class': 'col-form-label'}}) }}
+            {{ form_widget(participantForm.firstName, {'attr': {'class': 'form-control', 'style': 'width: 20%;'}}) }}
+            <small id="helpFirstName" class="form-text text-muted" style="display: flex;">
+                {{ form_label(participantForm.firstName) }}&nbsp must be 2-50 characters long.
+            </small>
+            <small id="firstName" style="color:red;">
+                {{ form_errors(participantForm.firstName) }}
+            </small>
+        </div>
+        <div class="col" id="some-custom-id">
+            {{ form_label(participantForm.lastName, null, {'label_attr': {'class': 'col-form-label'}}) }}
+            {{ form_widget(participantForm.lastName, {'attr': {'class': 'form-control', 'style': 'width: 20%;'}}) }}
+            <small id="helpLastName" class="form-text text-muted" style="display: flex;">
+                {{ form_label(participantForm.lastName) }}&nbsp must be 2-50 characters long.
+            </small>
+            <small id="lastName" style="color:red;">
+                {{ form_errors(participantForm.lastName) }}
+            </small>
+        </div>
+        <div class="col" id="some-custom-id">
+            {{ form_label(participantForm.email, null, {'label_attr': {'class': 'col-form-label'}}) }}
+            {{ form_widget(participantForm.email, {'attr': {'class': 'form-control', 'style': 'width: 20%;'}}) }}
+            <small id="helpEmail" class="form-text text-muted" style="display: flex;">
+                {{ form_label(participantForm.email) }}&nbsp must be like example@mail.com.
+            </small>
+            <small id="email" style="color:red;">
+                {{ form_errors(participantForm.email) }}
+            </small>
+        </div>
+        <div class="col" id="some-custom-id">
+            {{ form_label(participantForm.phoneNumber, null, {'label_attr': {'class': 'col-form-label'}}) }}
+            {{ form_widget(participantForm.phoneNumber, {'attr': {'class': 'form-control', 'style': 'width: 20%;'}}) }}
+            <small id="helpPhoneNumber" class="form-text text-muted" style="display: flex;">
+                {{ form_label(participantForm.phoneNumber) }}&nbsp must be a valid RO number.
+            </small>
+            <small id="phoneNumber" style="color:red;">
+                {{ form_errors(participantForm.phoneNumber) }}
+            </small>
+        </div>
+        <div class="col" id="some-custom-id">
+            {{ form_label(participantForm.receipt, null, {'label_attr': {'class': 'col-form-label'}}) }}
+            {{ form_widget(participantForm.receipt, {'attr': {'class': 'form-control', 'style': 'width: 20%;'}}) }}
+            <small id="helpPhoneNumber" class="form-text text-muted" style="display: flex;">
+                {{ form_label(participantForm.receipt) }}&nbsp must have a XX-XXX-XXXX format.
+            </small>
+            <small id="phoneNumber" style="color:red;">
+                {{ form_errors(participantForm.receipt) }}
+            </small>
+        </div>
+        <button type="submit" class="btn btn-primary">Submit</button>
+    </div>
+    {{ form_end(participantForm) }}
+
+    {% for message in app.flashes('success') %}
+        <div class="alert alert-notice">
+            {{ message }}
+        </div>
+    {% endfor %}
+
+    {% for message in app.flashes('warning') %}
+        <div class="alert alert-notice">
+            {{ message }}
+        </div>
+    {% endfor %}
+{% endblock %}
