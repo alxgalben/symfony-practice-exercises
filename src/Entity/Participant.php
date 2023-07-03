@@ -50,6 +50,11 @@ class Participant
      */
     private $submittedAt;
 
+    /**
+     * @ORM\Column(type="boolean")
+     */
+    private $isWinner = false;
+
     public function getId(): ?int
     {
         return $this->id;
@@ -123,6 +128,18 @@ class Participant
     public function setSubmittedAt(?\DateTimeInterface $submittedAt): self
     {
         $this->submittedAt = $submittedAt;
+
+        return $this;
+    }
+
+    public function isIsWinner(): ?bool
+    {
+        return $this->isWinner;
+    }
+
+    public function setIsWinner(bool $isWinner): self
+    {
+        $this->isWinner = $isWinner;
 
         return $this;
     }

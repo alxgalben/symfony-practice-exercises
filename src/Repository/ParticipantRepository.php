@@ -4,6 +4,8 @@ namespace App\Repository;
 
 use App\Entity\Participant;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\ORM\NonUniqueResultException;
+use Doctrine\ORM\NoResultException;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -21,6 +23,10 @@ class ParticipantRepository extends ServiceEntityRepository
         parent::__construct($registry, Participant::class);
     }
 
+    /**
+     * @throws NonUniqueResultException
+     * @throws NoResultException
+     */
     public function countUserReceiptCountToday(\DateTimeInterface $date, string $email): int
     {
         return $this->createQueryBuilder('p')
@@ -32,6 +38,42 @@ class ParticipantRepository extends ServiceEntityRepository
             ->setParameter('endOfDay', $date->format('Y-m-d 23:59:59'))
             ->getQuery()
             ->getSingleScalarResult();
+    }
+
+    public function findByDateInterval(\DateTimeInterface $startDate, \DateTimeInterface $endDate): array
+    {
+        $qb = $this->createQueryBuilder('p')
+            ->where('p.submittedAt >= :startDate')
+            ->andWhere('p.submittedAt <= :endDate')
+            /*->setParameter('startDate', $startDate)
+            ->setParameter('endDate', $endDate)*/
+            ->setParameters(['startDate' => $startDate, 'endDate' => $endDate]);
+
+        return $qb->getQuery()->getResult();
+    }
+
+    public function findWinnersPerWeek():array
+    {
+        $qb = $this->createQueryBuilder('p')
+            ->where('p.winner = true');
+
+        return $qb->getQuery()->getResult();
+    }
+
+    public function findWinnersPerWeekByNumber(int $weekNumber): array
+    {
+        $startDate = new \DateTimeImmutable();
+        $startDate->setISODate((int)date('Y'), $weekNumber);
+        $endDate = (clone $startDate)->modify('+1 week');
+
+        $qb = $this->createQueryBuilder('p')
+            ->where('p.submittedAt >= :startDate')
+            ->andWhere('p.submittedAt <= :endDate')
+            ->andWhere('p.isWinner = true')
+            ->setParameter('startDate', $startDate)
+            ->setParameter('endDate', $endDate);
+
+        return $qb->getQuery()->getResult();
     }
 
     public function add(Participant $entity, bool $flush = false): void
@@ -51,29 +93,4 @@ class ParticipantRepository extends ServiceEntityRepository
             $this->getEntityManager()->flush();
         }
     }
-
-//    /**
-//     * @return Participant[] Returns an array of Participant objects
-//     */
-//    public function findByExampleField($value): array
-//    {
-//        return $this->createQueryBuilder('p')
-//            ->andWhere('p.exampleField = :val')
-//            ->setParameter('val', $value)
-//            ->orderBy('p.id', 'ASC')
-//            ->setMaxResults(10)
-//            ->getQuery()
-//            ->getResult()
-//        ;
-//    }
-
-//    public function findOneBySomeField($value): ?Participant
-//    {
-//        return $this->createQueryBuilder('p')
-//            ->andWhere('p.exampleField = :val')
-//            ->setParameter('val', $value)
-//            ->getQuery()
-//            ->getOneOrNullResult()
-//        ;
-//    }
 }
