@@ -46,7 +46,7 @@ class Participant
     private $receipt;
 
     /**
-     * @ORM\Column(type="datetime", nullable=true)
+     * @ORM\Column(type="datetime_immutable", nullable=true)
      */
     private $submittedAt;
 
@@ -120,7 +120,7 @@ class Participant
         return $this;
     }
 
-    public function getSubmittedAt(): ?\DateTimeInterface
+    public function getSubmittedAt(): ?\DateTimeImmutable
     {
         return $this->submittedAt;
     }

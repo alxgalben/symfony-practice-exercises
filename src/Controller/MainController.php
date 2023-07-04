@@ -27,11 +27,11 @@ class MainController extends AbstractController
         $participantForm = $this->createForm(ParticipantFormType::class, $participant);
         $participantForm->handleRequest($request);
 
-        if($participantForm->isSubmitted() && $participantForm->isValid()){
+        if ($participantForm->isSubmitted() && $participantForm->isValid()) {
             $minute = (int)date('i');
             $prizes = array('casti', 'ghiozdan', 'mouse');
 
-            if($minute < 15) {
+            if ($minute < 15) {
                 $randomWordIndex = array_rand($prizes);
                 $randomWord = $prizes[$randomWordIndex];
                 $this->addFlash('success', 'You have won a special prize: ' . $randomWord);
@@ -71,7 +71,7 @@ class MainController extends AbstractController
     /**
      * @Route("/login", name="login")
      */
-    public function login(Request $request, AuthenticationUtils $authenticationUtils):Response
+    public function login(Request $request, AuthenticationUtils $authenticationUtils): Response
     {
         /*if($request->getMethod() === 'POST'){
             return $this->redirectToRoute('listing');
@@ -81,8 +81,8 @@ class MainController extends AbstractController
         $lastUsername = $authenticationUtils->getLastUsername();
 
         return $this->render('security/login.html.twig', [
-           'lastUsername' => $lastUsername,
-           'error' => $error
+            'lastUsername' => $lastUsername,
+            'error' => $error
         ]);
     }
 
@@ -96,7 +96,7 @@ class MainController extends AbstractController
     }
 
     /**
-     * @Route("/export-csv", name="export-csv")
+     * @Route("/export-csv/", name="export-csv")
      */
 
     public function exportCsv(Request $request, EntityManagerInterface $entityManager)
@@ -105,14 +105,23 @@ class MainController extends AbstractController
         $tmpFileName = (new Filesystem())->tempnam(sys_get_temp_dir(), 'sb_');
         $tmpFile = fopen($tmpFileName, 'wb+');
 
-        $startDate = $request->query->get('start_date');
-        $endDate = $request->query->get('end_date');
+        $startDateParam = $request->query->get('start_date');
+        $endDateParam = $request->query->get('end_date');
 
-        // Convert the string dates to DateTime objects
-        $startDate = new \DateTime($startDate);
-        $startDate->setTime(0,0,1);
-        $endDate = new \DateTime($endDate);
-        $endDate->setTime(23,59,59);
+        if (!$startDateParam || !$endDateParam) {
+            throw new \InvalidArgumentException('Both start_date and end_date parameters are required.');
+        }
+
+        $startDate = \DateTime::createFromFormat('Y-m-d', $startDateParam);
+        $endDate = \DateTime::createFromFormat('Y-m-d', $endDateParam);
+
+
+        if (!$startDate instanceof \DateTime || !$endDate instanceof \DateTime) {
+            throw new \InvalidArgumentException('Invalid date format. The dates should be in the format: "YYYY-MM-DD".');
+        }
+        $startDate->setTime(0, 0, 1);
+        $endDate->setTime(23, 59, 59);
+
         if (!\is_resource($tmpFile)) {
             throw new \RuntimeException('Unable to create a temporary file.');
         }
@@ -156,7 +165,7 @@ class MainController extends AbstractController
         $this->denyAccessUnlessGranted('ROLE_USER');
         $participant = $em->getRepository(Participant::class)->find($id);
 
-        if(!$participant){
+        if (!$participant) {
             throw $this->createNotFoundException('Participant not found');
         }
 
@@ -172,7 +181,7 @@ class MainController extends AbstractController
     public function winnerPerWeek(Request $request, EntityManagerInterface $em, ParticipantRepository $participantRepository): Response
     {
         $this->denyAccessUnlessGranted('ROLE_USER');
-        $selectedWeek = $request->query->get('week', 0);
+        $selectedWeek = $request->query->get('week', 1);
         //$winnersPerWeek = $em->getRepository(Participant::class)->findWinnersPerWeek();
         $winnersPerWeek = $em->getRepository(Participant::class)->findWinnersPerWeekByNumber($selectedWeek);
         return $this->render('listing/winners_per_week.html.twig', [

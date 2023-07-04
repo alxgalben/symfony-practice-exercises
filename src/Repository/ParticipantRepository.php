@@ -72,7 +72,7 @@ class ParticipantRepository extends ServiceEntityRepository
             ->andWhere('p.isWinner = true')
             ->setParameter('startDate', $startDate)
             ->setParameter('endDate', $endDate);
-
+        //dump($qb->getQuery()->getResult());
         return $qb->getQuery()->getResult();
     }
 
