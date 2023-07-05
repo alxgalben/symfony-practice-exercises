@@ -8,15 +8,19 @@
 
         {% block javascripts %}
             <script src="{{ asset('js/bootstrap.min.js') }}"></script>
+            <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
         {% endblock %}
 
 {% block content %}
     <h1>Enter details</h1>
-    {{ form_start(participantForm) }}
+    {# Your HTML form #}
+<div id="responseContainer"></div>
+<form name="participant_form" method="post" id="participantForm">
     <div class="col">
         <div class="form-group">
             {{ form_label(participantForm.firstName, null, {'label_attr': {'class': 'col-form-label'}}) }}
-            {{ form_widget(participantForm.firstName, {'attr': {'class': 'form-control', 'style': 'width: 20%;'}}) }}
+            {{ form_widget(participantForm.firstName, {'attr': {'class': 'form-control', 'style': 'width: 20%;', 'name': 'participantForm[firstName]'}}) }}
             <small id="helpFirstName" class="form-text text-muted" style="display: flex;">
                 {{ form_label(participantForm.firstName) }}&nbsp must be 2-50 characters long.
             </small>
@@ -26,7 +30,7 @@
         </div>
         <div class="col" id="some-custom-id">
             {{ form_label(participantForm.lastName, null, {'label_attr': {'class': 'col-form-label'}}) }}
-            {{ form_widget(participantForm.lastName, {'attr': {'class': 'form-control', 'style': 'width: 20%;'}}) }}
+            {{ form_widget(participantForm.lastName, {'attr': {'class': 'form-control', 'style': 'width: 20%;', 'name': 'participantForm[lastName]'}}) }}
             <small id="helpLastName" class="form-text text-muted" style="display: flex;">
                 {{ form_label(participantForm.lastName) }}&nbsp must be 2-50 characters long.
             </small>
@@ -36,7 +40,7 @@
         </div>
         <div class="col" id="some-custom-id">
             {{ form_label(participantForm.email, null, {'label_attr': {'class': 'col-form-label'}}) }}
-            {{ form_widget(participantForm.email, {'attr': {'class': 'form-control', 'style': 'width: 20%;'}}) }}
+            {{ form_widget(participantForm.email, {'attr': {'class': 'form-control', 'style': 'width: 20%;', 'name': 'participantForm[email]'}}) }}
             <small id="helpEmail" class="form-text text-muted" style="display: flex;">
                 {{ form_label(participantForm.email) }}&nbsp must be like example@mail.com.
             </small>
@@ -46,7 +50,7 @@
         </div>
         <div class="col" id="some-custom-id">
             {{ form_label(participantForm.phoneNumber, null, {'label_attr': {'class': 'col-form-label'}}) }}
-            {{ form_widget(participantForm.phoneNumber, {'attr': {'class': 'form-control', 'style': 'width: 20%;'}}) }}
+            {{ form_widget(participantForm.phoneNumber, {'attr': {'class': 'form-control', 'style': 'width: 20%;', 'name': 'participantForm[phoneNumber]'}}) }}
             <small id="helpPhoneNumber" class="form-text text-muted" style="display: flex;">
                 {{ form_label(participantForm.phoneNumber) }}&nbsp must be a valid RO number.
             </small>
@@ -56,7 +60,7 @@
         </div>
         <div class="col" id="some-custom-id">
             {{ form_label(participantForm.receipt, null, {'label_attr': {'class': 'col-form-label'}}) }}
-            {{ form_widget(participantForm.receipt, {'attr': {'class': 'form-control', 'style': 'width: 20%;'}}) }}
+            {{ form_widget(participantForm.receipt, {'attr': {'class': 'form-control', 'style': 'width: 20%;', 'name': 'participantForm[receipt]'}}) }}
             <small id="helpPhoneNumber" class="form-text text-muted" style="display: flex;">
                 {{ form_label(participantForm.receipt) }}&nbsp must have a XX-XXX-XXXX format.
             </small>
@@ -64,7 +68,7 @@
                 {{ form_errors(participantForm.receipt) }}
             </small>
         </div>
-        <button type="submit" class="btn btn-primary">Submit</button>
+        <button id="participantFormButton" type="submit" class="btn btn-primary">Submit</button>
     </div>
     {{ form_end(participantForm) }}
 
@@ -79,4 +83,38 @@
             {{ message }}
         </div>
     {% endfor %}
+
+    <script>
+        $(document).ready(function () {
+            $('#participantForm').on('submit', function (event) {
+                event.preventDefault();
+
+                const form = $(this);
+
+                $.ajax({
+                    url: '/api',
+                    method: 'POST',
+                    data: form.serialize(),
+                    success: function (data) {
+                        const responseContainer = $('#responseContainer');
+                        if (data.success) {
+                            responseContainer.html('<p class="success">' + data.message + '</p>');
+                        } else {
+                            let errorsHtml = '';
+                            data.errors.forEach(error => {
+                                errorsHtml += '<p class="error">' + error + '</p>';
+                            });
+                            responseContainer.html(errorsHtml);
+                        }
+                    },
+                    error: function (xhr, status, error) {
+                        console.error('Error:', error);
+                        const responseContainer = $('#responseContainer');
+                        responseContainer.html('<p class="error">An error occurred while communicating with the server.</p>');
+                    }
+                });
+            });
+        });
+    </script>
+
 {% endblock %}

@@ -9,23 +9,29 @@ use App\Repository\ReceiptCodeRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Security\Http\Authentication\AuthenticationUtils;
+use Symfony\Component\Validator\Validator\ValidatorInterface;
+use Symfony\Contracts\HttpClient\Exception\ClientExceptionInterface;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 class MainController extends AbstractController
 {
-    /**
-     * @Route("/main", name="homepage")
-     */
-    public function index(Request $request, EntityManagerInterface $em, ParticipantRepository $participantRepository): Response
+
+    /*public function indexApi(Request $request, EntityManagerInterface $em, ParticipantRepository $participantRepository, ValidatorInterface $validator, HttpClientInterface $httpClient): Response
     {
 
-        $this->denyAccessUnlessGranted('ROLE_USER');
+        //$this->denyAccessUnlessGranted('ROLE_USER');
+
+        $data = json_decode($request->getContent(), true);
+
         $participant = new Participant();
-        $participantForm = $this->createForm(ParticipantFormType::class, $participant);
+        $participantForm = $this->createForm(ParticipantFormType::class, $participant, ['csrf_protection' => false]);
         $participantForm->handleRequest($request);
+        $participantForm->submit($data);
 
         if ($participantForm->isSubmitted() && $participantForm->isValid()) {
             $minute = (int)date('i');
@@ -51,21 +57,122 @@ class MainController extends AbstractController
             }
             //dd($participant);
         }
+
+        if (!$participantForm->isValid()) {
+            $errors = [];
+            foreach ($participantForm->getErrors(true, true) as $formError) {
+                $field = $formError->getOrigin()->getName();
+                $message = $formError->getMessage();
+                $errors[] = sprintf('Field "%s": %s', $field, $message);
+            }
+            return new JsonResponse([
+                'success' => false,
+                'errors' => $errors
+            ]);
+        }
+
+        try {
+            $response = $httpClient->request('POST', 'http://dev.tema2/main-api', [
+                'headers' => [
+                    'Content-Type' => 'application/json',
+                ],
+                'json' => $data,
+            ]);
+
+            $responseData = $response->toArray();
+
+            if ($response->getStatusCode() === 200 && $responseData['success'] === true) {
+                $this->addFlash('success', $responseData['message']);
+            } else {
+                $errors = $responseData['errors'] ?? ['An error occurred.'];
+                foreach ($errors as $error) {
+                    $this->addFlash('error', $error);
+                }
+            }
+        } catch (ClientExceptionInterface $exception) {
+            // Handle any exceptions that may occur during the API request
+            $this->addFlash('error', 'An error occurred while communicating with the API.');
+        }
+
+        return new JsonResponse([
+            'success' => true,
+            'message' => 'Datele au fost salvate cu succes!'
+        ]);
+    }*/
+
+    /**
+     * @Route("/main", name="homepage")
+     */
+    public function index(Request $request, EntityManagerInterface $em, ParticipantRepository $participantRepository, ValidatorInterface $validator): Response
+    {
+        //$this->denyAccessUnlessGranted('ROLE_USER');
+        $participant = new Participant();
+        $participantForm = $this->createForm(ParticipantFormType::class, $participant);
+
         return $this->render('main/index.html.twig', [
-            'participantForm' => $participantForm->createView()
+            'participantForm' => $participantForm->createView(),
         ]);
     }
 
     /**
-     * @Route("/listing", name="listing")
+     * @Route("/api", name="api")
      */
-    public function listing(Request $request, EntityManagerInterface $em, ParticipantRepository $participantRepository): Response
+    public function indexApi(Request $request, EntityManagerInterface $em, ParticipantRepository $participantRepository, ValidatorInterface $validator): Response
     {
-        $this->denyAccessUnlessGranted('ROLE_USER');
-        $participantData = $participantRepository->findAll();
-        return $this->render('listing/listing.html.twig', [
-            'participantData' => $participantData
-        ]);
+        //$this->denyAccessUnlessGranted('ROLE_USER');
+        $participant = new Participant();
+        $participantForm = $this->createForm(ParticipantFormType::class, $participant);
+        $participantForm->handleRequest($request);
+
+        if ($participantForm->isSubmitted()) {
+            // Check if the form is valid
+            if ($participantForm->isValid()) {
+
+                $minute = (int)date('i');
+                $prizes = array('casti', 'ghiozdan', 'mouse');
+
+                if ($minute < 15) {
+                    $randomWordIndex = array_rand($prizes);
+                    $randomWord = $prizes[$randomWordIndex];
+                    $this->addFlash('success', 'You have won a special prize: ' . $randomWord);
+                }
+
+                $currentDate = new \DateTimeImmutable();
+                $participant->setSubmittedAt($currentDate);
+                $userReceiptCountToday = $participantRepository->countUserReceiptCountToday($currentDate, $participant->getEmail());
+
+                if ($userReceiptCountToday >= 2) {
+                    $this->addFlash('warning', 'You have already entered 2 receipts today. Come back tomorrow');
+                }
+
+                if ($userReceiptCountToday <= 2) {
+                    $em->persist($participant);
+                    $em->flush();
+                }
+
+                return new JsonResponse([
+                    'success' => true,
+                    'message' => 'Datele au fost salvate cu succes!',
+                ], 200);
+            } else {
+                $errors = [];
+                foreach ($participantForm->getErrors(true, true) as $formError) {
+                    $field = $formError->getOrigin()->getName();
+                    $message = $formError->getMessage();
+                    $errors[] = sprintf('Field "%s": %s', $field, $message);
+                }
+                return new JsonResponse([
+                    'success' => false,
+                    'errors' => $errors,
+                ], 200);
+            }
+
+        }
+
+        return new JsonResponse([
+            'success' => false,
+            'errors' => [],
+        ], 400);
     }
 
     /**
