@@ -62,9 +62,14 @@ class ParticipantRepository extends ServiceEntityRepository
 
     public function findWinnersPerWeekByNumber(int $weekNumber): array
     {
-        $startDate = new \DateTimeImmutable();
-        $startDate->setISODate((int)date('Y'), $weekNumber);
-        $endDate = (clone $startDate)->modify('+1 week');
+        $startDate= new \DateTime();
+        $endDate= new \DateTime();
+        $startDate->setISODate(2023, $weekNumber, 1);
+        $endDate->setISODate(2023, $weekNumber ,7);
+        $startDate->setTime(0,0,0);
+        $endDate->setTime(23,59,59);
+        //dd($startDate);
+        //dd($endDate);
 
         $qb = $this->createQueryBuilder('p')
             ->where('p.submittedAt >= :startDate')

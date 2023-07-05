@@ -110,9 +110,11 @@ class MainController extends AbstractController
 
         if (!$startDateParam || !$endDateParam) {
             throw new \InvalidArgumentException('Both start_date and end_date parameters are required.');
+
         }
 
         $startDate = \DateTime::createFromFormat('Y-m-d', $startDateParam);
+        //dd($startDate);
         $endDate = \DateTime::createFromFormat('Y-m-d', $endDateParam);
 
 

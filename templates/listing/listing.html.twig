@@ -44,7 +44,7 @@
                 <td><b>{{ value.receipt.name }}</b></td>
                 <td>
                     {% if not value.isWinner %}
-                        <a href="{{ path('winner', {'id': value.id}) }}">Mark as Winner</a>
+                        <a href="{{ path('winner', {'id': value.id}) }}">mark as winner</a>
                     {% else %}
                         Winner
                     {% endif %}
@@ -53,6 +53,8 @@
         {% endfor %}
         </tbody>
     </table>
-    <a href="{{ path('export-csv') }}" class="btn btn-info">Export CSV</a>
-    {# <a href="{{ path('export-csv', { 'start_date': 2023-07-03, 'end_date': 2023-07-03 }) }}" class="btn btn-primary">Export CSV</a> #}
+    {#<a href="{{ path('export-csv') }}" class="btn btn-info">Export CSV</a>#}
+    <a href="{{ path('export-csv', { 'start_date': '2023-01-03', 'end_date': '2023-01-03' }) }}" class="btn btn-primary">Export CSV</a>
+
+
 {% endblock %}
