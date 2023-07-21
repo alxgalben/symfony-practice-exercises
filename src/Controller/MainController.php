@@ -2,109 +2,41 @@
 
 namespace App\Controller;
 
+use App\Entity\ApiKey;
 use App\Entity\Participant;
+use App\Entity\ShortTimeToken;
 use App\Form\ParticipantFormType;
 use App\Repository\ParticipantRepository;
-use App\Repository\ReceiptCodeRepository;
+use DateTime;
+use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
+use Exception;
+use InvalidArgumentException;
+use Psr\Log\LoggerInterface;
+use RuntimeException;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Security\Http\Authentication\AuthenticationUtils;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
-use Symfony\Contracts\HttpClient\Exception\ClientExceptionInterface;
-use Symfony\Contracts\HttpClient\HttpClientInterface;
+use Sensio\Bundle\FrameworkExtraBundle\Configuration\Route;
+use function is_resource;
 
 class MainController extends AbstractController
 {
-
-    /*public function indexApi(Request $request, EntityManagerInterface $em, ParticipantRepository $participantRepository, ValidatorInterface $validator, HttpClientInterface $httpClient): Response
-    {
-
-        //$this->denyAccessUnlessGranted('ROLE_USER');
-
-        $data = json_decode($request->getContent(), true);
-
-        $participant = new Participant();
-        $participantForm = $this->createForm(ParticipantFormType::class, $participant, ['csrf_protection' => false]);
-        $participantForm->handleRequest($request);
-        $participantForm->submit($data);
-
-        if ($participantForm->isSubmitted() && $participantForm->isValid()) {
-            $minute = (int)date('i');
-            $prizes = array('casti', 'ghiozdan', 'mouse');
-
-            if ($minute < 15) {
-                $randomWordIndex = array_rand($prizes);
-                $randomWord = $prizes[$randomWordIndex];
-                $this->addFlash('success', 'You have won a special prize: ' . $randomWord);
-            }
-
-            $currentDate = new \DateTimeImmutable();
-            $participant->setSubmittedAt($currentDate);
-            $userReceiptCountToday = $participantRepository->countUserReceiptCountToday($currentDate, $participant->getEmail());
-
-            if ($userReceiptCountToday >= 2) {
-                $this->addFlash('warning', 'You have already entered 2 receipts today. Come back tomorrow');
-            }
-
-            if ($userReceiptCountToday <= 2) {
-                $em->persist($participant);
-                $em->flush();
-            }
-            //dd($participant);
-        }
-
-        if (!$participantForm->isValid()) {
-            $errors = [];
-            foreach ($participantForm->getErrors(true, true) as $formError) {
-                $field = $formError->getOrigin()->getName();
-                $message = $formError->getMessage();
-                $errors[] = sprintf('Field "%s": %s', $field, $message);
-            }
-            return new JsonResponse([
-                'success' => false,
-                'errors' => $errors
-            ]);
-        }
-
-        try {
-            $response = $httpClient->request('POST', 'http://dev.tema2/main-api', [
-                'headers' => [
-                    'Content-Type' => 'application/json',
-                ],
-                'json' => $data,
-            ]);
-
-            $responseData = $response->toArray();
-
-            if ($response->getStatusCode() === 200 && $responseData['success'] === true) {
-                $this->addFlash('success', $responseData['message']);
-            } else {
-                $errors = $responseData['errors'] ?? ['An error occurred.'];
-                foreach ($errors as $error) {
-                    $this->addFlash('error', $error);
-                }
-            }
-        } catch (ClientExceptionInterface $exception) {
-            // Handle any exceptions that may occur during the API request
-            $this->addFlash('error', 'An error occurred while communicating with the API.');
-        }
-
-        return new JsonResponse([
-            'success' => true,
-            'message' => 'Datele au fost salvate cu succes!'
-        ]);
-    }*/
-
     /**
      * @Route("/main", name="homepage")
      */
-    public function index(Request $request, EntityManagerInterface $em, ParticipantRepository $participantRepository, ValidatorInterface $validator): Response
+
+    public function index(Request $request, LoggerInterface $logger): Response
     {
+
+        $logger->info('Acces pe homepage', [
+            'date' => new DateTime(),
+            'ip' => $request->getClientIp(),
+        ]);
         //$this->denyAccessUnlessGranted('ROLE_USER');
         $participant = new Participant();
         $participantForm = $this->createForm(ParticipantFormType::class, $participant);
@@ -115,17 +47,100 @@ class MainController extends AbstractController
     }
 
     /**
+     * @Route("/api/register", name="api-register")
+     * @throws Exception
+     */
+    public function register(Request $request, EntityManagerInterface $em): JsonResponse
+    {
+        $apiKeyValue = $request->get('api-key');
+        $apiKey = $em->getRepository(ApiKey::class)->findOneBy(['apiKey' => $apiKeyValue]);
+
+        if (!$apiKey) {
+            return new JsonResponse(['error' => 'Invalid API key'], 401);
+        }
+
+        $token = bin2hex(random_bytes(32));
+        $refreshToken = bin2hex(random_bytes(32));
+
+        $tokenExpiration = new DateTime('now +1 hour');
+        $refreshTokenExpiration = new DateTime('now +5 days');
+
+        $shortLivedToken = new ShortTimeToken();
+        $shortLivedToken->setToken($token);
+        $shortLivedToken->setRefreshToken($refreshToken);
+        $shortLivedToken->setTokenExpiration($tokenExpiration);
+        $shortLivedToken->setRefreshTokenExpiration($refreshTokenExpiration);
+        $shortLivedToken->setApiKey($apiKey);
+
+        $em->persist($shortLivedToken);
+        $em->flush();
+
+        return new JsonResponse([
+            'token' => $token,
+            'refresh_token' => $refreshToken,
+            'token_validity' => $tokenExpiration->getTimestamp(),
+            'refresh_token_validity' => $refreshTokenExpiration->getTimestamp(),
+        ]);
+    }
+
+    /**
+     * @Route("/api/refresh-token", name="api-refresh-token")
+     * @throws Exception
+     */
+    public function refreshToken(Request $request, EntityManagerInterface $em): JsonResponse
+    {
+        $refreshToken = $request->request->get('refresh_token');
+
+        $shortTimeToken = $em->getRepository(ShortTimeToken::class)->findOneBy(['refreshToken' => $refreshToken]);
+
+        if (!$shortTimeToken) {
+            return new JsonResponse(['error' => 'Invalid refresh token'], 401);
+        }
+
+        $newToken = bin2hex(random_bytes(32));
+
+        $newTokenExpiration = new DateTime('now +1 hour');
+        $shortTimeToken->setToken($newToken);
+        $shortTimeToken->setTokenExpiration($newTokenExpiration);
+
+        $em->persist($shortTimeToken);
+        $em->flush();
+
+        return new JsonResponse([
+            'token' => $newToken,
+            'token_validity' => $newTokenExpiration->getTimestamp(),
+        ]);
+    }
+
+    /**
      * @Route("/api", name="api")
      */
-    public function indexApi(Request $request, EntityManagerInterface $em, ParticipantRepository $participantRepository, ValidatorInterface $validator): Response
+    public function indexApi(Request $request, EntityManagerInterface $em, ParticipantRepository $participantRepository, LoggerInterface $logger): Response
     {
         //$this->denyAccessUnlessGranted('ROLE_USER');
+
+        $apiKey = $request->get('api-key');
+        $envKeys = $this->getParameter("api_keys");
+        $validApiKeys = explode(',', $envKeys);
+
+        if (empty($apiKey)) {
+            return new JsonResponse([
+                'success' => false,
+                'message' => 'Please enter an API key.'
+            ], 200);
+        } else if (!in_array($apiKey, $validApiKeys)) {
+            return new JsonResponse([
+                'success' => false,
+                'message' => 'Unauthorized'
+            ], 401);
+        } //basic Auth algorithm symfony!!!!!!!!!!!!!!!!!!!!!
+
+
         $participant = new Participant();
         $participantForm = $this->createForm(ParticipantFormType::class, $participant);
         $participantForm->handleRequest($request);
 
         if ($participantForm->isSubmitted()) {
-            // Check if the form is valid
             if ($participantForm->isValid()) {
 
                 $minute = (int)date('i');
@@ -137,7 +152,7 @@ class MainController extends AbstractController
                     $this->addFlash('success', 'You have won a special prize: ' . $randomWord);
                 }
 
-                $currentDate = new \DateTimeImmutable();
+                $currentDate = new DateTimeImmutable();
                 $participant->setSubmittedAt($currentDate);
                 $userReceiptCountToday = $participantRepository->countUserReceiptCountToday($currentDate, $participant->getEmail());
 
@@ -149,6 +164,11 @@ class MainController extends AbstractController
                     $em->persist($participant);
                     $em->flush();
                 }
+
+                $logger->info('Salvare cu succes în API', [
+                    'date' => new DateTime(),
+                    'ip' => $request->getClientIp(),
+                ]);
 
                 return new JsonResponse([
                     'success' => true,
@@ -178,18 +198,29 @@ class MainController extends AbstractController
     /**
      * @Route("/login", name="login")
      */
-    public function login(Request $request, AuthenticationUtils $authenticationUtils): Response
-    {
-        /*if($request->getMethod() === 'POST'){
-            return $this->redirectToRoute('listing');
-        }*/
 
+    public function login(AuthenticationUtils $authenticationUtils, LoggerInterface $logger): Response
+    {
         $error = $authenticationUtils->getLastAuthenticationError();
         $lastUsername = $authenticationUtils->getLastUsername();
 
+        /*if ($error) {
+            $logger->info('Autentificare nereușită', [
+                'date' => new \DateTime(),
+                'ip' => $request->getClientIp(),
+                'status' => 'nereușită',
+            ]);
+        } else {
+            $logger->info('Autentificare reușită', [
+                'date' => new \DateTime(),
+                'ip' => $request->getClientIp(),
+                'status' => 'reușită',
+            ]);
+        }*/
+
         return $this->render('security/login.html.twig', [
             'lastUsername' => $lastUsername,
-            'error' => $error
+            'error' => $error,
         ]);
     }
 
@@ -205,7 +236,6 @@ class MainController extends AbstractController
     /**
      * @Route("/export-csv/", name="export-csv")
      */
-
     public function exportCsv(Request $request, EntityManagerInterface $entityManager)
     {
         $this->denyAccessUnlessGranted('ROLE_USER');
@@ -216,23 +246,23 @@ class MainController extends AbstractController
         $endDateParam = $request->query->get('end_date');
 
         if (!$startDateParam || !$endDateParam) {
-            throw new \InvalidArgumentException('Both start_date and end_date parameters are required.');
+            throw new InvalidArgumentException('Both start_date and end_date parameters are required.');
 
         }
 
-        $startDate = \DateTime::createFromFormat('Y-m-d', $startDateParam);
+        $startDate = DateTime::createFromFormat('Y-m-d', $startDateParam);
         //dd($startDate);
-        $endDate = \DateTime::createFromFormat('Y-m-d', $endDateParam);
+        $endDate = DateTime::createFromFormat('Y-m-d', $endDateParam);
 
 
-        if (!$startDate instanceof \DateTime || !$endDate instanceof \DateTime) {
-            throw new \InvalidArgumentException('Invalid date format. The dates should be in the format: "YYYY-MM-DD".');
+        if (!$startDate instanceof DateTime || !$endDate instanceof DateTime) {
+            throw new InvalidArgumentException('Invalid date format. The dates should be in the format: "YYYY-MM-DD".');
         }
         $startDate->setTime(0, 0, 1);
         $endDate->setTime(23, 59, 59);
 
-        if (!\is_resource($tmpFile)) {
-            throw new \RuntimeException('Unable to create a temporary file.');
+        if (!is_resource($tmpFile)) {
+            throw new RuntimeException('Unable to create a temporary file.');
         }
 
         $data = [
@@ -269,7 +299,7 @@ class MainController extends AbstractController
     /**
      * @Route("/winner/{id}", name="winner")
      */
-    public function markWinner(Request $request, EntityManagerInterface $em, $id): Response
+    public function markWinner(EntityManagerInterface $em, $id): Response
     {
         $this->denyAccessUnlessGranted('ROLE_USER');
         $participant = $em->getRepository(Participant::class)->find($id);
@@ -287,7 +317,7 @@ class MainController extends AbstractController
     /**
      * @Route("/winners-week", name="winner-week")
      */
-    public function winnerPerWeek(Request $request, EntityManagerInterface $em, ParticipantRepository $participantRepository): Response
+    public function winnerPerWeek(Request $request, EntityManagerInterface $em): Response
     {
         $this->denyAccessUnlessGranted('ROLE_USER');
         $selectedWeek = $request->query->get('week', 1);

@@ -13,8 +13,7 @@
         {% endblock %}
 
 {% block content %}
-    <h1>Enter details</h1>
-    {# Your HTML form #}
+<h1>Enter details</h1>
 <div id="responseContainer"></div>
 <form name="participant_form" method="post" id="participantForm">
     <div class="col">
@@ -70,6 +69,7 @@
         </div>
         <button id="participantFormButton" type="submit" class="btn btn-primary">Submit</button>
     </div>
+</form>
     {{ form_end(participantForm) }}
 
     {% for message in app.flashes('success') %}
@@ -90,9 +90,8 @@
                 event.preventDefault();
 
                 const form = $(this);
-
                 $.ajax({
-                    url: '/api',
+                    url: '/api?api-key=gi7pwVZB9MC0lYRChx7yAvN04hXn7WqmVK',
                     method: 'POST',
                     data: form.serialize(),
                     success: function (data) {
@@ -116,5 +115,4 @@
             });
         });
     </script>
-
 {% endblock %}
