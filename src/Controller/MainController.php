@@ -3,10 +3,12 @@
 namespace App\Controller;
 
 use App\Entity\ApiKey;
+use App\Entity\RateLimit;
 use App\Entity\Participant;
 use App\Entity\ShortTimeToken;
 use App\Form\ParticipantFormType;
 use App\Repository\ParticipantRepository;
+use App\Repository\RateLimitRepository;
 use DateTime;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
@@ -20,12 +22,13 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Security\Http\Authentication\AuthenticationUtils;
-use Symfony\Component\Validator\Validator\ValidatorInterface;
-use Sensio\Bundle\FrameworkExtraBundle\Configuration\Route;
 use function is_resource;
+use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 class MainController extends AbstractController
 {
+
     /**
      * @Route("/main", name="homepage")
      */
@@ -115,7 +118,7 @@ class MainController extends AbstractController
     /**
      * @Route("/api", name="api")
      */
-    public function indexApi(Request $request, EntityManagerInterface $em, ParticipantRepository $participantRepository, LoggerInterface $logger): Response
+    public function indexApi(Request $request, EntityManagerInterface $em, ParticipantRepository $participantRepository, LoggerInterface $logger, RateLimitRepository $rateLimitRepository): Response
     {
         //$this->denyAccessUnlessGranted('ROLE_USER');
 
